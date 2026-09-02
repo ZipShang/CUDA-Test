@@ -1,69 +1,29 @@
-# Prerequisites
-*.d
+# Visual Studio user and workspace state
+.vs/
+*.suo
+*.user
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
+# Build products
+x64/
+Debug/
+Release/
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
 *.pdb
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-*.so.*
-
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
+*.ilk
 *.exe
-*.out
-*.app
-
-# Build directories
-build/
-Build/
-build-*/
-
-# CMake generated files
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-Makefile
-install_manifest.txt
-compile_commands.json
-
-# Temporary files
-*.tmp
+*.dll
+*.lib
+*.exp
+*.idb
+*.ipdb
+*.iobj
+*.tlog
 *.log
-*.bak
-*.swp
+*.cache
+*.deps
+*.recipe
 
-# vcpkg
-vcpkg_installed/
-
-# debug information files
-*.dwo
-
-# test output & cache
-Testing/
-.cache/
+# CUDA/Nsight profiling exports
+*.nsys-rep
+*.sqlite
+*Events_cuda_gpu_trace.csv
