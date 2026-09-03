@@ -21,12 +21,13 @@ CUDATest/
 
 ## 当前版本
 
-当前活动实现对应 [v01_host_roundtrip](CUDATest/versions/v01_host_roundtrip/README.md)：
+当前活动实现对应 [v03_pinned_async_pipeline](CUDATest/versions/v03_pinned_async_pipeline/README.md)：
 
 - CPU 和 GPU 使用完全一致的两两归约顺序和整数向下取整规则；
 - 程序逐像素比较 CPU/GPU 输出，只有完全一致才保存 GPU 输出图；
-- GPU 流程运行 10 次，输出第 6～10 次的平均墙钟耗时；
-- `CUDATestRepo.nsys-rep` 的后 5 轮 GPU 活动平均约为 53.212 ms，其中数据传输占约 96.98%。
+- 使用 5 片 device buffer、一个传输 stream 和一个计算 stream；
+- 输入输出使用页锁定内存，通过 event 实现 H2D、kernel 和 buffer 复用同步；
+- 每轮计时包含资源申请、页锁定、GPU 流程与资源释放；最近后 5 轮平均约为 24.8 ms。
 
 ## 开发规则
 
