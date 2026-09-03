@@ -3,7 +3,6 @@
 #include <chrono>
 #include <cuda_runtime.h>
 #include <vector>
-#include <queue>
 #include <opencv2/opencv.hpp>
 #include "KernelApi.h"
 
@@ -48,6 +47,7 @@ bool Proc(vector<cv::Mat>& Images, cv::Mat& BlendingImage)
 	}
 
 	const size_t imageSize = Images[0].total();
+	const int ImageNum = Images.size();
 	constexpr int threadsPerBlock = 256;
 	const int blocksPerGrid = static_cast<int>((imageSize + threadsPerBlock - 1) / threadsPerBlock);
 	constexpr int totalRuns = 10;
@@ -56,42 +56,37 @@ bool Proc(vector<cv::Mat>& Images, cv::Mat& BlendingImage)
 
 	for (int run = 0; run < totalRuns; ++run)
 	{
-		std::queue<cv::Mat> qImages;
-		for (const auto& item : Images) {
-			// Keep Proc from overwriting the caller's input images.
-			qImages.push(item.clone());
-		}
-
 		const auto start = std::chrono::steady_clock::now();
 
 		//2. Allocate device buffers, transfer data, launch the kernel, and release buffers.
-		unsigned char* devPtr_in1 = nullptr;
-		unsigned char* devPtr_in2 = nullptr;
-		unsigned char* devPtr_out = nullptr;
-		CHECK(cudaMalloc(&devPtr_in1, imageSize));
-		CHECK(cudaMalloc(&devPtr_in2, imageSize));
-		CHECK(cudaMalloc(&devPtr_out, imageSize));
-
-		while (qImages.size() > 1)
+		unsigned char** devPtr_in = new unsigned char*[ImageNum];
+		for (int i = 0; i < ImageNum; i++)
 		{
-			cv::Mat Input1 = qImages.front();
-			qImages.pop();
-			cv::Mat Input2 = qImages.front();
-			qImages.pop();
-			CHECK(cudaMemcpy(devPtr_in1, Input1.ptr(), imageSize, cudaMemcpyHostToDevice));
-			CHECK(cudaMemcpy(devPtr_in2, Input2.ptr(), imageSize, cudaMemcpyHostToDevice));
+			CHECK(cudaMalloc(&devPtr_in[i], imageSize));
+			CHECK(cudaMemcpy(devPtr_in[i], Images[i].ptr(), imageSize, cudaMemcpyHostToDevice));
+		}
+		cv::Mat result(Images[0].rows, Images[0].cols, CV_8UC1);
 
-			blendImage<<<blocksPerGrid, threadsPerBlock>>>(devPtr_in1, devPtr_in2, devPtr_out, imageSize);
-			CHECK(cudaGetLastError());
-
-			CHECK(cudaMemcpy(Input1.ptr(), devPtr_out, imageSize, cudaMemcpyDeviceToHost));
-			qImages.push(Input1);
+		int RunIndex = 1;
+		while (RunIndex <= 8)
+		{
+			int Start = 0;
+			while (Start + RunIndex < ImageNum)
+			{
+				blendImage<<<blocksPerGrid,threadsPerBlock>>>(devPtr_in[Start], devPtr_in[Start + RunIndex], devPtr_in[Start], imageSize);
+				CHECK(cudaGetLastError());
+				Start += (RunIndex * 2);
+			}
+			RunIndex *= 2;
 		}
 
-		cv::Mat result = qImages.front().clone();
-		CHECK(cudaFree(devPtr_out));
-		CHECK(cudaFree(devPtr_in2));
-		CHECK(cudaFree(devPtr_in1));
+		CHECK(cudaMemcpy(result.ptr(), devPtr_in[0], imageSize, cudaMemcpyDeviceToHost));
+
+		for (int i = 0; i < ImageNum; i++)
+		{
+			CHECK(cudaFree(devPtr_in[i]));
+		}
+		delete[] devPtr_in;
 
 		runTimesMs[run] = std::chrono::duration<double, std::milli>(
 			std::chrono::steady_clock::now() - start).count();
