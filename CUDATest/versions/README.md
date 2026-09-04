@@ -10,6 +10,7 @@ Visual Studio 工程仍编译上级目录中的活动源码。
 | [v03_pinned_async_pipeline](v03_pinned_async_pipeline/README.md) | 5-buffer、双 stream、页锁定内存与 event 驱动同步。 |
 | [v04_single_kernel_reduction](v04_single_kernel_reduction/README.md) | 单个 kernel 内完成 2 的幂次图像归约。 |
 | [v05_concurrent_async_pipelines](v05_concurrent_async_pipelines/README.md) | 三主机线程并发提交异步流水线，并与串行提交对照。 |
+| [v06_pinned_reuse_kernel_concurrency](v06_pinned_reuse_kernel_concurrency/README.md) | 固定锁页 staging 内存复用，以及质量检测与融合 kernel 并发的单变量对照。 |
 
 冻结新版本时：
 
@@ -19,4 +20,4 @@ Visual Studio 工程仍编译上级目录中的活动源码。
 4. 写入 README，记录实现差异、测试数据和已知限制；
 5. 之后只在活动源码中开始下一轮优化。
 
-当前活动实现已对应 `v05_concurrent_async_pipelines`；下一轮优化应从上级活动源码继续开发。
+当前活动实现已对应 `v06_pinned_reuse_kernel_concurrency`；下一轮优化应从上级活动源码继续开发。
