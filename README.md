@@ -23,11 +23,11 @@ CUDATest/
 
 当前活动实现对应 [v04_single_kernel_reduction](CUDATest/versions/v04_single_kernel_reduction/README.md)：
 
-- CPU 和 GPU 使用完全一致的两两归约顺序和整数向下取整规则；
-- 程序逐像素比较 CPU/GPU 输出，只有完全一致才保存 GPU 输出图；
-- 16 张输入图像存入一片连续 device 内存，中间结果原地覆盖归约树的左节点；
+- 活动源码保留 `Proc1`～`Proc4` 多接口，便于横向比较不同优化方案；入口当前默认调用 `Proc4`；
+- `Proc4` 将 16 张输入图像存入一片连续 device 内存，中间结果原地覆盖归约树的左节点；
 - 一个 `blendImageIter` kernel 在每个像素线程内完成 15 次分层融合；
-- 每轮计时包含输出 `cv::Mat` 创建、显存申请、H→D、kernel、D→H 与显存释放。
+- CPU 和 GPU 使用完全一致的两两归约顺序和整数向下取整规则，并逐像素比较输出；
+- `v04_single_kernel_reduction` 快照仍保持独立的单一 `Proc` 接口，符合历史版本目录规范。
 
 ## 开发规则
 

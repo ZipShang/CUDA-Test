@@ -104,7 +104,7 @@ int main()
 	}
 
 	cv::Mat gpuBlendingImage;
-	if (!Proc(Images, gpuBlendingImage))
+	if (!Proc4(Images, gpuBlendingImage))
 	{
 		cerr << "GPU image blending failed." << endl;
 		return 1;
