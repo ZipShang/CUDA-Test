@@ -2,12 +2,10 @@
 
 ## 计时口径
 
-当前 `File.cu` 输出的 `GPU async pipeline` 时间是 CPU 墙钟时间，每轮包含：
+`File.cu` 输出的时间是 CPU 墙钟时间，每轮包含：
 
 - 输出 `cv::Mat` 创建；
-- 输入输出页锁定内存的注册和解除；
-- 5 片 device buffer 的 `cudaMalloc` / `cudaFree`；
-- stream 和 event 的创建与销毁；
+- device 内存申请与释放；
 - H→D、kernel、D→H 与 CPU 端等待。
 
 Nsight Systems 的 CUDA GPU 汇总只统计 GPU 上实际发生的 memcpy 与 kernel 时间；
@@ -28,18 +26,27 @@ Nsight Systems 的 CUDA GPU 汇总只统计 GPU 上实际发生的 memcpy 与 ke
 ### v03_pinned_async_pipeline
 
 使用 5 个 device buffer、一个传输 stream 和一个计算 stream。输入和输出页锁定后，
-通过 `cudaMemcpyAsync` 和 event 驱动的 buffer pool 重叠 H2D 与 kernel。当前后 5 轮
-Nsight GPU 时间跨度约为 11.816 ms；完整生命周期 CPU 墙钟时间约为 24.8 ms。
+通过 `cudaMemcpyAsync` 和 event 驱动的 buffer pool 重叠 H2D 与 kernel。
 
-## 下一步：v04_kernel_and_memory_tuning
+### v04_single_kernel_reduction
 
-当传输与资源生命周期成本已明确后，继续分析 kernel 和内存策略：
+将 16 张图像放入一片连续 device 内存。`blendImageIter` 的每个线程处理一个像素偏移，
+在一个 kernel 内按 `8 + 4 + 2 + 1` 的树形顺序完成融合，并将每层结果原地写回左节点。
 
-- 用 Nsight Compute 检查带宽、occupancy 和访存效率；
+Nsight Systems 第 6～10 轮平均：16 次 H2D 为 `17.080 ms`，单次 kernel 为 `1.886 ms`，
+最终 D2H 为 `1.808 ms`，GPU 时间跨度为 `22.397 ms`。相对 v02，kernel 时间由约
+`2.442 ms` 降至 `1.886 ms`；但 v02 使用 16 次独立分配、v04 使用 1 次连续分配，完整
+生命周期收益不能全部归因于单 kernel。
+
+## 下一步：v05_fair_kernel_comparison
+
+为隔离 kernel 融合的收益，让对照版本与 v04 使用同一片连续显存和相同的传输方式，
+仅比较 15 次 kernel launch 与 1 次 kernel launch：
+
+- 使用 Nsight Compute 检查带宽、occupancy 和访存效率；
 - 测试不同 block 大小（128 / 256 / 512）；
-- 对比“每轮注册页锁定内存”与“复用 pinned host buffer”两种计时口径；
-- 评估 CUDA Graph 或融合更多归约层以减少 launch 开销；
-- 评估向量化访问、批处理多个图像或更高精度融合。
+- 评估向量化访问或使用 shared memory 的收益；
+- 在相同资源生命周期口径下比较单 kernel 与多 kernel。
 
 ## 每个版本的记录模板
 

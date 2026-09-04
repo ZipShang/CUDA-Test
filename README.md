@@ -21,13 +21,13 @@ CUDATest/
 
 ## 当前版本
 
-当前活动实现对应 [v03_pinned_async_pipeline](CUDATest/versions/v03_pinned_async_pipeline/README.md)：
+当前活动实现对应 [v04_single_kernel_reduction](CUDATest/versions/v04_single_kernel_reduction/README.md)：
 
 - CPU 和 GPU 使用完全一致的两两归约顺序和整数向下取整规则；
 - 程序逐像素比较 CPU/GPU 输出，只有完全一致才保存 GPU 输出图；
-- 使用 5 片 device buffer、一个传输 stream 和一个计算 stream；
-- 输入输出使用页锁定内存，通过 event 实现 H2D、kernel 和 buffer 复用同步；
-- 每轮计时包含资源申请、页锁定、GPU 流程与资源释放；最近后 5 轮平均约为 24.8 ms。
+- 16 张输入图像存入一片连续 device 内存，中间结果原地覆盖归约树的左节点；
+- 一个 `blendImageIter` kernel 在每个像素线程内完成 15 次分层融合；
+- 每轮计时包含输出 `cv::Mat` 创建、显存申请、H→D、kernel、D→H 与显存释放。
 
 ## 开发规则
 

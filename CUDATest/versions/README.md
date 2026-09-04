@@ -8,6 +8,7 @@ Visual Studio 工程仍编译上级目录中的活动源码。
 | [v01_host_roundtrip](v01_host_roundtrip/README.md) | 每次融合均发生主机往返的基线实现。 |
 | [v02_device_resident_reduction](v02_device_resident_reduction/README.md) | 中间结果驻留 GPU，最终只回传一张图。 |
 | [v03_pinned_async_pipeline](v03_pinned_async_pipeline/README.md) | 5-buffer、双 stream、页锁定内存与 event 驱动同步。 |
+| [v04_single_kernel_reduction](v04_single_kernel_reduction/README.md) | 单个 kernel 内完成 2 的幂次图像归约。 |
 
 冻结新版本时：
 
@@ -17,4 +18,4 @@ Visual Studio 工程仍编译上级目录中的活动源码。
 4. 写入 README，记录实现差异、测试数据和已知限制；
 5. 之后只在活动源码中开始下一轮优化。
 
-当前活动实现已对应 `v03_pinned_async_pipeline`；下一轮优化应从上级活动源码继续开发。
+当前活动实现已对应 `v04_single_kernel_reduction`；下一轮优化应从上级活动源码继续开发。
