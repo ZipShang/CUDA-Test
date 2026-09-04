@@ -21,13 +21,13 @@ CUDATest/
 
 ## 当前版本
 
-当前活动实现对应 [v04_single_kernel_reduction](CUDATest/versions/v04_single_kernel_reduction/README.md)：
+当前活动实现对应 [v05_concurrent_async_pipelines](CUDATest/versions/v05_concurrent_async_pipelines/README.md)：
 
-- 活动源码保留 `Proc1`～`Proc4` 多接口，便于横向比较不同优化方案；入口当前默认调用 `Proc4`；
-- `Proc4` 将 16 张输入图像存入一片连续 device 内存，中间结果原地覆盖归约树的左节点；
-- 一个 `blendImageIter` kernel 在每个像素线程内完成 15 次分层融合；
+- 活动源码保留 `Proc1`～`Proc5` 及 `Proc5_Compare` 接口，便于横向比较不同优化方案；入口当前默认调用 `Proc5`；
+- `Proc5` 使用 3 个主机线程并发提交各自独立的双 stream CUDA 异步流水线；`Proc5_Compare` 串行提交同样的 3 条流水线；
+- 两种模式均复用 v03 的 5-buffer、页锁定内存和 event 驱动归约方案；
 - CPU 和 GPU 使用完全一致的两两归约顺序和整数向下取整规则，并逐像素比较输出；
-- `v04_single_kernel_reduction` 快照仍保持独立的单一 `Proc` 接口，符合历史版本目录规范。
+- `v05_concurrent_async_pipelines` 是包含并发与串行对照的冻结快照。
 
 ## 开发规则
 

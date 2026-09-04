@@ -38,7 +38,13 @@ Nsight Systems 第 6～10 轮平均：16 次 H2D 为 `17.080 ms`，单次 kernel
 `2.442 ms` 降至 `1.886 ms`；但 v02 使用 16 次独立分配、v04 使用 1 次连续分配，完整
 生命周期收益不能全部归因于单 kernel。
 
-## 下一步：v05_fair_kernel_comparison
+### v05_concurrent_async_pipelines
+
+使用三个主机线程并发提交三条与 v03 相同的双 stream 异步流水线，并使用单主机线程串行提交相同三条流水线作为对照。后 5 轮的 3 条流水线批次 CPU 墙钟时间分别为 `70.389 ms` 与 `76.142 ms`，并发模式缩短 `7.6%`。
+
+两种模式的 GPU 工作量一致；Nsight Systems 中并发模式的 kernel 和 H2D 累计时间略高，说明吞吐提升主要来自主机侧资源管理、提交和等待路径的并行化，而非 GPU 单项操作加速。每轮仍重复进行页锁定注册/解除、显存申请/释放、stream/event 创建/销毁。
+
+## 下一步：v06_fair_kernel_comparison
 
 为隔离 kernel 融合的收益，让对照版本与 v04 使用同一片连续显存和相同的传输方式，
 仅比较 15 次 kernel launch 与 1 次 kernel launch：
