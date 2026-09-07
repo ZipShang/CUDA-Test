@@ -260,6 +260,90 @@ bool Proc2(std::vector<cv::Mat>& Images, cv::Mat& BlendingImage)
 	return true;
 }
 
+// Proc2 的线程块大小测试重载：完整执行 16 图设备端归约，并单独记录 15 次融合 kernel 的耗时。
+bool Proc2(std::vector<cv::Mat>& images, cv::Mat& blendingImage, int ThreadNumPerBlock)
+{
+	if (images.empty() || images[0].empty() || images[0].type() != CV_8UC1 ||
+		images[0].rows == 0 || images[0].cols == 0 || !images[0].isContinuous() ||
+		images.size() != kImageCount)
+		return false;
+	for (int imageIndex = 1; imageIndex < kImageCount; ++imageIndex)
+		if (images[imageIndex].empty() || images[imageIndex].size() != images[0].size() ||
+			images[imageIndex].type() != CV_8UC1 || !images[imageIndex].isContinuous())
+			return false;
+
+	cudaDeviceProp deviceProperties = {};
+	CHECK(cudaGetDeviceProperties(&deviceProperties, 0));
+	if (ThreadNumPerBlock <= 0 || ThreadNumPerBlock > deviceProperties.maxThreadsPerBlock) {
+		fprintf(stderr, "Invalid Proc2 overload block size %d; device maximum is %d.\n",
+			ThreadNumPerBlock, deviceProperties.maxThreadsPerBlock);
+		return false;
+	}
+
+	const size_t imageSize = images[0].total();
+	constexpr int totalRuns = 10, warmupRuns = 5;
+	const int blocksPerGrid = static_cast<int>((imageSize + ThreadNumPerBlock - 1) / ThreadNumPerBlock);
+	double wallTimesMs[totalRuns] = {};
+	float kernelTimesMs[totalRuns] = {};
+
+	for (int run = 0; run < totalRuns; ++run) {
+		const auto wallStart = std::chrono::steady_clock::now();
+		cv::Mat result(images[0].rows, images[0].cols, CV_8UC1);
+		unsigned char* deviceImages = nullptr;
+		cudaEvent_t kernelStart = nullptr;
+		cudaEvent_t kernelEnd = nullptr;
+
+		CHECK(cudaMalloc(&deviceImages, imageSize * kImageCount));
+		for (int imageIndex = 0; imageIndex < kImageCount; ++imageIndex) {
+			CHECK(cudaMemcpy(deviceImages + static_cast<size_t>(imageIndex) * imageSize,
+				images[imageIndex].ptr(), imageSize, cudaMemcpyHostToDevice));
+		}
+		CHECK(cudaEventCreate(&kernelStart));
+		CHECK(cudaEventCreate(&kernelEnd));
+		CHECK(cudaEventRecord(kernelStart));
+
+		// 与 Proc2/Proc4 相同的二叉归约树；唯一实验变量是 ThreadNumPerBlock。
+		int pairDistance = 1;
+		while (pairDistance < kImageCount) {
+			for (int firstImage = 0; firstImage + pairDistance < kImageCount;
+				firstImage += pairDistance * 2) {
+				unsigned char* left = deviceImages + static_cast<size_t>(firstImage) * imageSize;
+				unsigned char* right = deviceImages + static_cast<size_t>(firstImage + pairDistance) * imageSize;
+				blendImage << <blocksPerGrid, ThreadNumPerBlock >> > (left, right, left, imageSize);
+				CHECK(cudaGetLastError());
+			}
+			pairDistance <<= 1;
+		}
+
+		CHECK(cudaEventRecord(kernelEnd));
+		CHECK(cudaEventSynchronize(kernelEnd));
+		CHECK(cudaEventElapsedTime(&kernelTimesMs[run], kernelStart, kernelEnd));
+		CHECK(cudaMemcpy(result.ptr(), deviceImages, imageSize, cudaMemcpyDeviceToHost));
+		CHECK(cudaEventDestroy(kernelEnd));
+		CHECK(cudaEventDestroy(kernelStart));
+		CHECK(cudaFree(deviceImages));
+
+		if (run == totalRuns - 1)
+			blendingImage = result;
+		wallTimesMs[run] = std::chrono::duration<double, std::milli>(
+			std::chrono::steady_clock::now() - wallStart).count();
+		printf("Proc2 overload block %d run %d: wall = %.3f ms, kernels = %.3f ms%s\n",
+			ThreadNumPerBlock, run + 1, wallTimesMs[run], kernelTimesMs[run],
+			run < warmupRuns ? " (warm-up)" : "");
+	}
+
+	double wallTotalMs = 0.0;
+	double kernelTotalMs = 0.0;
+	for (int run = warmupRuns; run < totalRuns; ++run) {
+		wallTotalMs += wallTimesMs[run];
+		kernelTotalMs += kernelTimesMs[run];
+	}
+	printf("Proc2 overload block %d average (runs %d-%d): wall = %.3f ms, 15 kernels = %.3f ms\n",
+		ThreadNumPerBlock, warmupRuns + 1, totalRuns,
+		wallTotalMs / (totalRuns - warmupRuns), kernelTotalMs / (totalRuns - warmupRuns));
+	return true;
+}
+
 // compute stream & copy stream,最大化显存复用，将图像传输流与核函数调用流最大程度并行
 bool Proc3(std::vector<cv::Mat>& Images, cv::Mat& BlendingImage)
 {
@@ -644,7 +728,7 @@ bool Proc5_Compare(std::vector<cv::Mat>& Images, cv::Mat& BlendingImage)
 	return true;
 }
 
-// 申请固定缓存，对固定缓存进行复用，CUDA调用逻辑同Proc
+// 申请固定缓存，对固定缓存进行复用，CUDA调用逻辑同Proc3
 bool Proc6(std::vector<cv::Mat>& images, cv::Mat& blendingImage)
 {
 	if (images.empty() || images[0].empty() || images[0].type() != CV_8UC1 ||
@@ -793,7 +877,7 @@ bool Proc6(std::vector<cv::Mat>& images, cv::Mat& blendingImage)
 	return true;
 }
 
-// 全分辨率等权融合与输入亮度/对比度一致性检测并行执行。
+// 核函数并发测试。
 bool Proc7(std::vector<cv::Mat>& images, cv::Mat& blendingImage)
 {
 	if (images.empty() || images[0].empty() || images[0].type() != CV_8UC1 ||
@@ -934,7 +1018,7 @@ bool Proc7(std::vector<cv::Mat>& images, cv::Mat& blendingImage)
 	return true;
 }
 
-// 满 grid 的质量统计与全分辨率融合在同一 stream 中严格串行，用于对比 Proc7 的并发设计。
+// 核函数满SM串行，对比Proc7
 bool Proc7_Compare(std::vector<cv::Mat>& images, cv::Mat& blendingImage)
 {
 	if (images.empty() || images[0].empty() || images[0].type() != CV_8UC1 ||
